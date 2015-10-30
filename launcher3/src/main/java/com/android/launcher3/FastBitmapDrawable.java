@@ -1,0 +1,264 @@
+/*
+ * Copyright (C) 2008 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.android.launcher3;
+
+import android.animation.ObjectAnimator;
+import android.animation.TimeInterpolator;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
+import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
+import android.util.SparseArray;
+
+/**
+ * 其实FastBitmapDrawable本身确实快了那么一点，但是本质上并不是说从Render或者GPU加速的界别
+ * 进行优化加速，而只是简单的用了一些技巧，来时Bitmap的加载速度确实提升了一些
+ * 以下是来自StackOverflow上面的解释：
+ * It's not really fair to compare a FastBitmapDrawable to a Bitmap. Traditional
+ * Bitmaps are just a type of Object in Java. FastBitmapDrawables however, are a
+ * custom class written to extend the functionality of the Drawable class, not the
+ * Bitmap class.
+ *
+ * A FastBitmapDrawable contains a traditional Bitmap, and makes a few assumptions
+ * that make it convenient to use in certain situations. This is the crucial line:
+ *
+ * <code>canvas.drawBitmap(mBitmap, 0.0f, 0.0f, null);</code>
+ *
+ * This FastBitmapDrawable assumes that the bitmap will be placed at (0, 0) on the
+ * screen, and that no special Paint object will be used to draw it.
+ *
+ * (以下就是为什么FastBitmapDrawable要比普通的Drawable要快的根本原因)
+ * Really it's just a convenience. You could get the same performance by manually
+ * setting the position to (0, 0) and the Paint to null in a normal Drawable, but
+ * this class does that for you automatically.
+ *
+ */
+class FastBitmapDrawable extends Drawable {
+
+    // 定义FastBitmapDrawble点击动画的Time Interpolator时间引擎的计算过程
+    static final TimeInterpolator CLICK_FEEDBACK_INTERPOLATOR = new TimeInterpolator() {
+
+        @Override
+        public float getInterpolation(float input) {
+            if (input < 0.05f) {
+                return input / 0.05f;
+            } else if (input < 0.3f){
+                return 1;
+            } else {
+                return (1 - input) / 0.7f;
+            }
+        }
+    };
+
+    static final long CLICK_FEEDBACK_DURATION = 2000;
+
+    private static final int PRESSED_BRIGHTNESS = 100;
+    private static ColorMatrix sGhostModeMatrix;
+    private static final ColorMatrix sTempMatrix = new ColorMatrix();
+
+    /**
+     * Store the brightness colors filters to optimize animations during icon press. This
+     * only works for non-ghost-mode icons.
+     * 考虑到每次重新创建一个Matrix还是很耗费时间的，所以我们将每次用于调节明亮度的Matrix直接保存
+     * 到SparseArray
+     *
+     * (通常我们都是考虑使用HashMap或者HashMap的简化形式的SparseArray来创建缓存)
+     *
+     */
+    private static final SparseArray<ColorFilter> sCachedBrightnessFilter =
+            new SparseArray<>();
+
+    private static final int GHOST_MODE_MIN_COLOR_RANGE = 130;
+
+    private final Paint mPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
+    private final Bitmap mBitmap;
+    private int mAlpha;
+
+    private int mBrightness = 0;
+    private boolean mGhostModeEnabled = false;
+
+    private boolean mPressed = false;
+    private ObjectAnimator mPressedAnimator;
+
+    FastBitmapDrawable(Bitmap b) {
+        mAlpha = 255;
+        mBitmap = b;
+        setBounds(0, 0, b.getWidth(), b.getHeight());
+    }
+
+    @Override
+    public void draw(Canvas canvas) {
+        final Rect r = getBounds();
+        // Draw the bitmap into the bounding rect
+        canvas.drawBitmap(mBitmap, null, r, mPaint);
+    }
+
+    @Override
+    public void setColorFilter(ColorFilter cf) {
+        // No op
+    }
+
+    @Override
+    public int getOpacity() {
+        return PixelFormat.TRANSLUCENT;
+    }
+
+    @Override
+    public void setAlpha(int alpha) {
+        mAlpha = alpha;
+        mPaint.setAlpha(alpha);
+    }
+
+    @Override
+    public void setFilterBitmap(boolean filterBitmap) {
+        mPaint.setFilterBitmap(filterBitmap);
+        mPaint.setAntiAlias(filterBitmap);
+    }
+
+    public int getAlpha() {
+        return mAlpha;
+    }
+
+    @Override
+    public int getIntrinsicWidth() {
+        return mBitmap.getWidth();
+    }
+
+    @Override
+    public int getIntrinsicHeight() {
+        return mBitmap.getHeight();
+    }
+
+    @Override
+    public int getMinimumWidth() {
+        return getBounds().width();
+    }
+
+    @Override
+    public int getMinimumHeight() {
+        return getBounds().height();
+    }
+
+    public Bitmap getBitmap() {
+        return mBitmap;
+    }
+
+    /**
+     * When enabled, the icon is grayed out and the contrast is increased to give it a 'ghost'
+     * appearance.
+     */
+    public void setGhostModeEnabled(boolean enabled) {
+        if (mGhostModeEnabled != enabled) {
+            mGhostModeEnabled = enabled;
+            updateFilter();
+        }
+    }
+
+    public void setPressed(boolean pressed) {
+        if (mPressed != pressed) {
+            mPressed = pressed;
+            if (mPressed) {
+                mPressedAnimator = ObjectAnimator
+                        .ofInt(this, "brightness", PRESSED_BRIGHTNESS)
+                        .setDuration(CLICK_FEEDBACK_DURATION);
+                mPressedAnimator.setInterpolator(CLICK_FEEDBACK_INTERPOLATOR);
+                mPressedAnimator.start();
+            } else if (mPressedAnimator != null) {
+                mPressedAnimator.cancel();
+                setBrightness(0);
+            }
+        }
+        invalidateSelf();
+    }
+
+    public boolean isGhostModeEnabled() {
+        return mGhostModeEnabled;
+    }
+
+    public int getBrightness() {
+        return mBrightness;
+    }
+
+    public void setBrightness(int brightness) {
+        if (mBrightness != brightness) {
+            mBrightness = brightness;
+            updateFilter();
+            invalidateSelf();
+        }
+    }
+
+    private void updateFilter() {
+        if (mGhostModeEnabled) {
+            if (sGhostModeMatrix == null) {
+                sGhostModeMatrix = new ColorMatrix();
+                // 设置颜色的饱和度
+                sGhostModeMatrix.setSaturation(0);
+
+                // For ghost mode, set the color range to [GHOST_MODE_MIN_COLOR_RANGE, 255]
+                float range = (255 - GHOST_MODE_MIN_COLOR_RANGE) / 255.0f;
+                sTempMatrix.set(new float[] {
+                        range, 0,     0,     0, GHOST_MODE_MIN_COLOR_RANGE,
+                        0,     range, 0,     0, GHOST_MODE_MIN_COLOR_RANGE,
+                        0,     0,     range, 0, GHOST_MODE_MIN_COLOR_RANGE,
+                        0,     0,     0,     1, 0
+                });
+                sGhostModeMatrix.preConcat(sTempMatrix);
+            }
+
+            if (mBrightness == 0) {
+                mPaint.setColorFilter(new ColorMatrixColorFilter(sGhostModeMatrix));
+            } else {
+                setBrightnessMatrix(sTempMatrix, mBrightness);
+                sTempMatrix.postConcat(sGhostModeMatrix);
+                mPaint.setColorFilter(new ColorMatrixColorFilter(sTempMatrix));
+            }
+        } else if (mBrightness != 0) {
+            // 创建用于调节Drawable明亮度的ColorFilter
+            ColorFilter filter = sCachedBrightnessFilter.get(mBrightness);
+            if (filter == null) {
+                filter = new PorterDuffColorFilter(Color.argb(mBrightness, 255, 255, 255),
+                        PorterDuff.Mode.SRC_ATOP);
+                sCachedBrightnessFilter.put(mBrightness, filter);
+            }
+            mPaint.setColorFilter(filter);
+        } else {
+            mPaint.setColorFilter(null);
+        }
+    }
+
+    private static void setBrightnessMatrix(ColorMatrix matrix, int brightness) {
+        // Brightness: C-new = C-old*(1-amount) + amount
+        float scale = 1 - brightness / 255.0f;
+        matrix.setScale(scale, scale, scale, 1);
+        float[] array = matrix.getArray();
+
+        // Add the amount to RGB components of the matrix, as per the above formula.
+        // Fifth elements in the array correspond to the constant being added to
+        // red, blue, green, and alpha channel respectively.
+        array[4] = brightness;
+        array[9] = brightness;
+        array[14] = brightness;
+    }
+}

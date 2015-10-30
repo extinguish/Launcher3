@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2009 The Android Open Source Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<!--
+        favorite 配置的是Launcher3初始化时，位于整个Workspace当中的Shortcut的信息，我们在Launcher3首次安装时，可以看到
+        Launcher3当中会默认在Workspace当中显示一些程序(当我们有Docker时，我们确实是需要这个默认配置信息的，但是如果我们没有
+        Docker时，我们就不再需要这些默认信息了，因为我们的新的实现当中是所有的App默认就出现在Workspace当中的，所以我们不再
+        需要这个favorites的配置信息了)。同时我们也可以看到下面的无论是favorite还是appWidget标签，她们的配置当中都包含了一个
+        launcher:screen属性，即这些默认的Shortcut默认放置的screen值。
+        另外appWidget用于标示App Widget的配置
+        search用于标示在哪里存放Google Search Bar
+
+        关于这个文件的具体的解析过程是在LauncherProvider.loadFavorite()方法当中，这个方法当中定义了完成的解析规则
+        在不同的Launcher版本当中，支持的标签也会有区别，同时支持的解析规则也不同
+
+
+-->
+<favorites
+    xmlns:launcher="http://schemas.android.com/apk/res-auto/com.android.launcher3">
+    <!-- 最左侧的screen，即0号screen-->
+    <!-- Far-left screen [0] -->
+
+    <!-- 1号screen-->
+    <!-- Left screen [1] -->
+    <appwidget
+        launcher:packageName="com.android.settings"
+        launcher:className="com.android.settings.widget.SettingsAppWidgetProvider"
+        launcher:screen="1"
+        launcher:x="0"
+        launcher:y="3"
+        launcher:spanX="4"
+        launcher:spanY="1"/>
+
+    <!-- Middle screen [2] -->
+    <appwidget
+        launcher:packageName="com.android.deskclock"
+        launcher:className="com.android.alarmclock.AnalogAppWidgetProvider"
+        launcher:screen="2"
+        launcher:x="1"
+        launcher:y="0"
+        launcher:spanX="2"
+        launcher:spanY="2"/>
+    <favorite
+        launcher:packageName="com.android.camera"
+        launcher:className="com.android.camera.Camera"
+        launcher:screen="2"
+        launcher:x="0"
+        launcher:y="3"/>
+
+    <!-- Right screen [3] -->
+    <favorite
+        launcher:packageName="com.android.gallery3d"
+        launcher:className="com.android.gallery3d.app.Gallery"
+        launcher:screen="3"
+        launcher:x="1"
+        launcher:y="3"/>
+    <favorite
+        launcher:packageName="com.android.settings"
+        launcher:className="com.android.settings.Settings"
+        launcher:screen="3"
+        launcher:x="2"
+        launcher:y="3"/>
+
+    <!-- Far-right screen [4] -->
+
+    <!-- Hotseat (We use the screen as the position of the item in the hotseat) -->
+    <!-- Dialer, Contacts, [All Apps], Messaging, Browser -->
+    <resolve
+        launcher:container="-101"
+        launcher:screen="0"
+        launcher:x="0"
+        launcher:y="0">
+        <favorite launcher:uri="#Intent;action=android.intent.action.DIAL;end"/>
+        <favorite launcher:uri="tel:123"/>
+        <favorite launcher:uri="#Intent;action=android.intent.action.CALL_BUTTON;end"/>
+
+        <favorite
+            launcher:packageName="com.android.dialer"
+            launcher:className="com.android.dialer.DialtactsActivity"/>
+    </resolve>
+
+    <favorite
+        launcher:packageName="com.android.contacts"
+        launcher:className="com.android.contacts.activities.PeopleActivity"
+        launcher:container="-101"
+        launcher:screen="1"
+        launcher:x="1"
+        launcher:y="0"/>
+
+    <resolve
+        launcher:container="-101"
+        launcher:screen="3"
+        launcher:x="3"
+        launcher:y="0">
+        <favorite
+            launcher:uri="#Intent;action=android.intent.action.MAIN;category=android.intent.category.APP_MESSAGING;end"/>
+        <favorite launcher:uri="sms:"/>
+        <favorite launcher:uri="smsto:"/>
+        <favorite launcher:uri="mms:"/>
+        <favorite launcher:uri="mmsto:"/>
+
+        <favorite
+            launcher:packageName="com.android.mms"
+            launcher:className="com.android.mms.ui.ConversationList"/>
+    </resolve>
+    <resolve
+        launcher:container="-101"
+        launcher:screen="4"
+        launcher:x="4"
+        launcher:y="0">
+        <favorite
+            launcher:uri="#Intent;action=android.intent.action.MAIN;category=android.intent.category.APP_BROWSER;end"/>
+        <favorite launcher:uri="http://www.example.com/"/>
+
+        <favorite
+            launcher:packageName="com.android.browser"
+            launcher:className="com.android.browser.BrowserActivity"/>
+    </resolve>
+
+</favorites>

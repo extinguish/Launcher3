@@ -1,0 +1,22 @@
+<resources>
+    <bool name="config_largeHeap">true</bool>
+    <bool name="is_large_tablet">true</bool>
+
+    <!-- AllApps/Customize/AppsCustomize -->
+    <!-- Out of 100, the percent to shrink the workspace during spring loaded mode. -->
+    <integer name="config_workspaceSpringLoadShrinkPercentage">90</integer>
+
+    <!-- Workspace -->
+    <!-- Whether or not the drop targets drop down as opposed to fade in -->
+    <bool name="config_useDropTargetDownTransition">false</bool>
+
+    <!-- Camera distance for the overscroll effect -->
+    <integer name="config_cameraDistance">18000</integer>
+
+    <!-- 现在的屏幕的大小是sw720dp，也就是屏幕比较大的时候，此时我们不应该在
+         允许hotseat可以位于屏幕的最左侧，即即使当当前的screen orientation
+         是horizontal或landscape时，我们也不允许hotseat从屏幕的bottom移动到
+         left side,因为这是Table的布局设计 -->
+    <!-- Hotseat -->
+    <bool name="hotseat_transpose_layout_with_orientation">false</bool>
+</resources>
